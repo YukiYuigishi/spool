@@ -37,14 +37,9 @@ func catIndex(cmd *cobra.Command, args []string) {
 	if err := binary.Read(r, binary.BigEndian, &h.IndexEntrie); err != nil {
 		panic(err)
 	}
-	if err := binary.Read(r, binary.BigEndian, &h.Extensions); err != nil {
-		panic(err)
-	}
 
 	fmt.Println("----index file----")
 	fmt.Printf("Signature: %s\n", h.Signature)
 	fmt.Printf("Version: %+v\n", h.Version)
 	fmt.Printf("IndexEntire: %+v\n", h.IndexEntrie)
-	fmt.Printf("Extensions: %+v\n", h.Extensions)
-
 }
