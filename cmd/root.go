@@ -90,4 +90,5 @@ func init() {
 	})))
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(NewHashObjectCmd())
+	rootCmd.AddCommand(NewCatFileCmd())
 }

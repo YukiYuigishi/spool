@@ -1,22 +1,20 @@
 package cmd
 
 import (
-	"compress/zlib"
-	"crypto/sha1"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
 
+	"github.com/YukiYuigishi/spool/pkg/git"
 	"github.com/spf13/cobra"
 )
 
 type HashObjectOptions struct {
 	UseStdin bool
 	Write    bool
+	Type     string
 }
 
 func NewHashObjectCmd() *cobra.Command {
@@ -33,12 +31,13 @@ func NewHashObjectCmd() *cobra.Command {
 
 	flags := cmd.Flags()
 	flags.BoolVar(&opts.UseStdin, "stdin", false, "input from stdio")
-	flags.BoolVar(&opts.Write, "w", false, "store object")
+	flags.BoolVarP(&opts.Write, "write", "w", false, "store object")
+	flags.StringVarP(&opts.Type, "type", "t", string(git.ObjectTypeBlob), "object type")
 
 	return cmd
 }
 
-func runHashObjetCmd(cmd *cobra.Command, opts *HashObjectOptions, args []string) error {
+func runHashObjetCmd(_ *cobra.Command, opts *HashObjectOptions, args []string) error {
 	// いったんwriteのみ
 	// spool hash-object -w target.txt
 	if len(args) < 1 {
@@ -69,64 +68,19 @@ func runHashObjetCmd(cmd *cobra.Command, opts *HashObjectOptions, args []string)
 	if err != nil {
 		return err
 	}
-	header := fmt.Sprintf("blob %d\x00", stat.Size())
 
-	h := sha1.New()
-	if _, err := h.Write([]byte(header)); err != nil {
+	objType, err := git.ParseObjectType(opts.Type)
+	if err != nil {
 		return err
 	}
 
-	if _, err := io.Copy(h, f); err != nil {
+	hash, objectPath, err := git.StoreObject(objectsdir, objType, stat.Size(), f)
+	if err != nil {
 		return err
 	}
 
-	hash := h.Sum(nil)
 	fmt.Printf("%x\t%x/%x\n", hash, hash[:1], hash[1:])
-
-	objectpath := filepath.Join(objectsdir, fmt.Sprintf("%x", hash[:1]), fmt.Sprintf("%x", hash[1:]))
-	log.Println(objectpath)
-	objdir := filepath.Join(objectsdir, hex.EncodeToString(hash[:1]))
-	log.Printf("object directory; %s\n", objdir)
-
-	// mkdir gitroot/.git/objects/hash[:1]
-	err = os.Mkdir(objdir, 0755)
-	log.Println(err)
-	if err != nil {
-		if !os.IsExist(err) {
-			return err
-		}
-	}
-
-	gitobject := filepath.Join(objdir, hex.EncodeToString(hash[1:]))
-	// ファイルが存在している場合は終了
-	_, err = os.Stat(gitobject)
-	if err == nil {
-		return nil
-	}
-	if !os.IsNotExist(err) {
-		return err
-	}
-
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		return err
-	}
-
-	objFile, err := os.Create(gitobject)
-	if err != nil {
-		return err
-	}
-	defer objFile.Close()
-
-	zw := zlib.NewWriter(objFile)
-	defer zw.Close()
-
-	if _, err := zw.Write([]byte(header)); err != nil {
-		return err
-	}
-
-	if _, err := io.Copy(zw, f); err != nil {
-		return err
-	}
+	log.Println(objectPath)
 
 	return nil
 }
@@ -202,10 +156,3 @@ func ResolveForGitRoot(start ...string) (string, error) {
 	}
 	return "", fmt.Errorf(".git not found from %s", searchRoot)
 }
-
-type ObjectType int
-
-const (
-	ObjectBlob ObjectType = iota
-	ObjectTree
-)
