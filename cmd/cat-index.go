@@ -10,17 +10,23 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var catIndexCommand = &cobra.Command{
-	Use:   "cat-index",
-	Short: "show index file detail",
-	Long:  "show index file detail",
-	Run:   catIndex,
+func NewCatIndexCmd() *cobra.Command {
+
+	cmd := &cobra.Command{
+		Use:   "cat-index",
+		Short: "cat git index file",
+		Long:  "cat git index file",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runCatIndexCmd(cmd, args)
+		},
+	}
+	return cmd
 }
 
-func catIndex(cmd *cobra.Command, args []string) {
+func runCatIndexCmd(_ *cobra.Command, _ []string) error {
 	f, err := os.Open(".git/index")
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer f.Close()
 
@@ -29,17 +35,18 @@ func catIndex(cmd *cobra.Command, args []string) {
 	var h git.IndexHeader
 
 	if err := binary.Read(r, binary.BigEndian, &h.Signature); err != nil {
-		panic(err)
+		return err
 	}
 	if err := binary.Read(r, binary.BigEndian, &h.Version); err != nil {
-		panic(err)
+		return err
 	}
-	if err := binary.Read(r, binary.BigEndian, &h.IndexEntrie); err != nil {
-		panic(err)
+	if err := binary.Read(r, binary.BigEndian, &h.IndexEntries); err != nil {
+		return err
 	}
 
 	fmt.Println("----index file----")
 	fmt.Printf("Signature: %s\n", h.Signature)
 	fmt.Printf("Version: %+v\n", h.Version)
-	fmt.Printf("IndexEntire: %+v\n", h.IndexEntrie)
+	fmt.Printf("IndexEntire: %+v\n", h.IndexEntries)
+	return nil
 }
